@@ -1,0 +1,244 @@
+openapi: "3.1.0"
+info:
+  title: QR Code API
+  description: Generate customizable QR codes with support for colors, embedded logos, custom sizes, and multiple output formats (PNG, SVG). Built for scale with tiered pricing.
+  version: "1.0.0"
+  contact:
+    name: API Support
+servers:
+  - url: https://qr-api.onrender.com/v1
+    description: Production server
+
+paths:
+  /generate:
+    post:
+      summary: Generate a QR code
+      description: Generate a QR code from text or URL. Returns the QR code image directly.
+      operationId: generateQR
+      tags:
+        - QR Code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QRGenerateRequest"
+      responses:
+        "200":
+          description: QR code image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generate/bulk:
+    post:
+      summary: Generate multiple QR codes
+      description: Generate up to 100 QR codes in a single request. Returns base64-encoded images.
+      operationId: generateQRBulk
+      tags:
+        - QR Code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QRGenerateBulkRequest"
+      responses:
+        "200":
+          description: Bulk QR generation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QRGenerateBulkResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API is running
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+components:
+  schemas:
+    QRGenerateRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Text or URL to encode in the QR code
+          example: "https://example.com"
+        size:
+          type: integer
+          minimum: 50
+          maximum: 4096
+          default: 200
+          description: QR code image size in pixels
+          example: 500
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          default: "#000000"
+          description: Foreground color in hex format
+          example: "#FF5733"
+        bg_color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          default: "#FFFFFF"
+          description: Background color in hex format
+          example: "#F0F0F0"
+        format:
+          type: string
+          enum:
+            - png
+            - svg
+          default: png
+          description: Output image format
+        logo:
+          type: string
+          nullable: true
+          description: Base64-encoded logo image to embed in the center of the QR code
+          example: "iVBORw0KGgoAAAANSUhEUgAAAAE..."
+
+    QRGenerateBulkItem:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Text or URL to encode
+        size:
+          type: integer
+          minimum: 50
+          maximum: 4096
+          default: 200
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          default: "#000000"
+        bg_color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          default: "#FFFFFF"
+        logo:
+          type: string
+          nullable: true
+
+    QRGenerateBulkRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/QRGenerateBulkItem"
+        format:
+          type: string
+          enum:
+            - png
+            - svg
+          default: png
+
+    QRGenerateBulkResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              qr:
+                type: string
+                nullable: true
+                description: Base64-encoded QR code image
+              error:
+                type: string
+                nullable: true
+        error:
+          type: string
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "rate_limit_exceeded"
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
